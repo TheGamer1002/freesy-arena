@@ -29,7 +29,6 @@ func (ampSpeaker *AmpSpeaker) UpdateState(
 	coopButton bool,
 	matchStartTime,
 	currentTime time.Time,
-	isPlayoffMatch bool,
 ) {
 		newAmpNotes := ampNoteCount - ampSpeaker.ampNotesScored()
 		newSpeakerNotes := speakerNoteCount - ampSpeaker.speakerNotesScored()
@@ -55,7 +54,7 @@ func (ampSpeaker *AmpSpeaker) UpdateState(
 
 		// Handle the co-op button.
 		if coopButton && !ampSpeaker.CoopActivated && ampSpeaker.BankedAmpNotes >= 1 &&
-			ampSpeaker.IsCoopWindowOpen(matchStartTime, currentTime) && !isPlayoffMatch {
+			ampSpeaker.IsCoopWindowOpen(matchStartTime, currentTime) {
 			ampSpeaker.CoopActivated = true
 			ampSpeaker.BankedAmpNotes--
 		}
