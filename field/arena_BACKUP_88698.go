@@ -924,6 +924,7 @@ var blueAmplifiedTimeRemaining_ons = false
 // Updates the score given new input information from the field PLC, and actuates PLC outputs accordingly.
 func (arena *Arena) handlePlcInputOutput() {
 	if !arena.Plc.IsEnabled() {
+<<<<<<< HEAD
 		// Declare and initialize arrays
 		redEStops, blueEStops := [3]bool{}, [3]bool{}
 		redAStops, blueAStops := [3]bool{}, [3]bool{}
@@ -931,11 +932,59 @@ func (arena *Arena) handlePlcInputOutput() {
 		for i := range redEStops {
 			redEStops[i] = false
 			redAStops[i] = false
+=======
+		return
+	}
+
+	// Handle PLC functions that are always active.
+	if arena.Plc.GetFieldEStop() && !arena.matchAborted {
+		arena.AbortMatch()
+	}
+	redEStops, blueEStops := arena.Plc.GetTeamEStops()
+	redAStops, blueAStops := arena.Plc.GetTeamAStops()
+	arena.handleTeamStop("R1", redEStops[0], redAStops[0])
+	arena.handleTeamStop("R2", redEStops[1], redAStops[1])
+	arena.handleTeamStop("R3", redEStops[2], redAStops[2])
+	arena.handleTeamStop("B1", blueEStops[0], blueAStops[0])
+	arena.handleTeamStop("B2", blueEStops[1], blueAStops[1])
+	arena.handleTeamStop("B3", blueEStops[2], blueAStops[2])
+	redEthernets, blueEthernets := arena.Plc.GetEthernetConnected()
+	arena.AllianceStations["R1"].Ethernet = redEthernets[0]
+	arena.AllianceStations["R2"].Ethernet = redEthernets[1]
+	arena.AllianceStations["R3"].Ethernet = redEthernets[2]
+	arena.AllianceStations["B1"].Ethernet = blueEthernets[0]
+	arena.AllianceStations["B2"].Ethernet = blueEthernets[1]
+	arena.AllianceStations["B3"].Ethernet = blueEthernets[2]
+
+	// Handle in-match PLC functions.
+	redScore := &arena.RedRealtimeScore.CurrentScore
+	oldRedScore := *redScore
+	oldRedAmplifiedTimeRemainingSec := arena.RedRealtimeScore.AmplifiedTimeRemainingSec
+	blueScore := &arena.BlueRealtimeScore.CurrentScore
+	oldBlueScore := *blueScore
+	oldBlueAmplifiedTimeRemainingSec := arena.BlueRealtimeScore.AmplifiedTimeRemainingSec
+	matchStartTime := arena.MatchStartTime
+	currentTime := time.Now()
+	teleopGracePeriod := matchStartTime.Add(
+		game.GetDurationToTeleopEnd() + game.SpeakerTeleopGracePeriodSec*time.Second,
+	)
+	inGracePeriod := arena.MatchState == PostMatch && currentTime.Before(teleopGracePeriod) && !arena.matchAborted
+
+	redAllianceReady := arena.checkAllianceStationsReady("R1", "R2", "R3") == nil
+	blueAllianceReady := arena.checkAllianceStationsReady("B1", "B2", "B3") == nil
+
+	// Handle the evergreen PLC functions: stack lights, stack buzzer, and field reset light.
+	switch arena.MatchState {
+	case PreMatch:
+		if arena.lastMatchState != PreMatch {
+			arena.Plc.SetFieldResetLight(true)
+>>>>>>> Team254/main
 		}
 		for i := range blueEStops {
 			blueEStops[i] = false
 			blueAStops[i] = false
 		}
+<<<<<<< HEAD
 		arena.handleTeamStop("R1", redEStops[0], redAStops[0])
 		arena.handleTeamStop("R2", redEStops[1], redAStops[1])
 		arena.handleTeamStop("R3", redEStops[2], redAStops[2])
@@ -954,6 +1003,78 @@ func (arena *Arena) handlePlcInputOutput() {
 		currentTime := time.Now()
 		teleopGracePeriod := matchStartTime.Add(
 			game.GetDurationToTeleopEnd() + game.SpeakerTeleopGracePeriodSec*time.Second,
+=======
+	case PostMatch:
+		if arena.FieldReset {
+			arena.Plc.SetFieldResetLight(true)
+		}
+		scoreReady := arena.RedRealtimeScore.FoulsCommitted && arena.BlueRealtimeScore.FoulsCommitted &&
+			arena.alliancePostMatchScoreReady("red") && arena.alliancePostMatchScoreReady("blue")
+		arena.Plc.SetStackLights(false, false, !scoreReady, false)
+	case AutoPeriod, PausePeriod, TeleopPeriod:
+		arena.Plc.SetStackBuzzer(false)
+		arena.Plc.SetStackLights(!redAllianceReady, !blueAllianceReady, false, true)
+	}
+
+	// Get all the game-specific inputs and update the score.
+	redAmplifyButton, redCoopButton, blueAmplifyButton, blueCoopButton := arena.Plc.GetAmpButtons()
+	var redAmpNoteCount, redSpeakerNoteCount, blueAmpNoteCount, blueSpeakerNoteCount int
+	if arena.MatchState != PreMatch {
+		// Don't read the registers pre-match to avoid messing up the amp/speaker state from any manual testing.
+		redAmpNoteCount, redSpeakerNoteCount, blueAmpNoteCount, blueSpeakerNoteCount =
+			arena.Plc.GetAmpSpeakerNoteCounts()
+	}
+	redAmpSpeaker := &arena.RedRealtimeScore.CurrentScore.AmpSpeaker
+	blueAmpSpeaker := &arena.BlueRealtimeScore.CurrentScore.AmpSpeaker
+	redAmpSpeaker.UpdateState(
+		redAmpNoteCount,
+		redSpeakerNoteCount,
+		redAmplifyButton,
+		redCoopButton,
+		matchStartTime,
+		currentTime,
+		arena.CurrentMatch.Type == model.Playoff,
+	)
+	blueAmpSpeaker.UpdateState(
+		blueAmpNoteCount,
+		blueSpeakerNoteCount,
+		blueAmplifyButton,
+		blueCoopButton,
+		matchStartTime,
+		currentTime,
+		arena.CurrentMatch.Type == model.Playoff,
+	)
+	redAmplifiedTimeRemaining := redAmpSpeaker.AmplifiedTimeRemaining(currentTime)
+	arena.RedRealtimeScore.AmplifiedTimeRemainingSec = int(math.Ceil(redAmplifiedTimeRemaining))
+	blueAmplifiedTimeRemaining := blueAmpSpeaker.AmplifiedTimeRemaining(currentTime)
+	arena.BlueRealtimeScore.AmplifiedTimeRemainingSec = int(math.Ceil(blueAmplifiedTimeRemaining))
+	if !oldRedScore.Equals(redScore) || !oldBlueScore.Equals(blueScore) ||
+		oldRedAmplifiedTimeRemainingSec != arena.RedRealtimeScore.AmplifiedTimeRemainingSec ||
+		oldBlueAmplifiedTimeRemainingSec != arena.BlueRealtimeScore.AmplifiedTimeRemainingSec {
+		arena.RealtimeScoreNotifier.Notify()
+	}
+
+	// Handle the amp outputs.
+	if arena.MatchState == AutoPeriod || arena.MatchState == PausePeriod || arena.MatchState == TeleopPeriod {
+		redLowAmpLight := redAmpSpeaker.BankedAmpNotes >= 1
+		redHighAmpLight := redAmpSpeaker.BankedAmpNotes >= 2
+		redCoopAmpLight := redAmpSpeaker.CoopActivated
+		if redAmplifiedTimeRemaining > 0 {
+			redLowAmpLight = int(redAmplifiedTimeRemaining*4)%2 == 0
+			redHighAmpLight = !redLowAmpLight
+		}
+
+		blueLowAmpLight := blueAmpSpeaker.BankedAmpNotes >= 1
+		blueHighAmpLight := blueAmpSpeaker.BankedAmpNotes >= 2
+		blueCoopAmpLight := blueAmpSpeaker.CoopActivated
+		if blueAmplifiedTimeRemaining > 0 {
+			blueLowAmpLight = int(blueAmplifiedTimeRemaining*4)%2 == 0
+			blueHighAmpLight = !blueLowAmpLight
+		}
+
+		arena.Plc.SetAmpLights(
+			redLowAmpLight, redHighAmpLight, redCoopAmpLight, blueLowAmpLight, blueHighAmpLight, blueCoopAmpLight,
+>>>>>>> Team254/main
 		)
 		inGracePeriod := arena.MatchState == PostMatch && currentTime.Before(teleopGracePeriod)
 

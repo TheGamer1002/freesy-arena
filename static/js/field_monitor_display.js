@@ -8,7 +8,7 @@ var currentMatchId;
 var redSide;
 var blueSide;
 var lowBatteryThreshold = 8;
-var highBtuThreshold = 4.0;
+var highBtuThreshold = 7.0;
 
 
 var handleArenaStatus = function(data) {
@@ -80,6 +80,9 @@ var handleArenaStatus = function(data) {
     const wifiStatus = stationStatus.WifiStatus;
     teamRadioTextElement.text(wifiStatus.TeamId);
 
+    $("#accessPointStatus").attr("data-status", data.AccessPointStatus);
+    $("#switchStatus").attr("data-status", data.SwitchStatus);
+
     if (stationStatus.DsConn) {
       // Format the driver station status box.
       var dsConn = stationStatus.DsConn;
@@ -87,7 +90,8 @@ var handleArenaStatus = function(data) {
       teamDsElement.text(dsConn.MissedPacketCount);
 
       // Format the radio status box according to the connection status of the robot radio.
-      var radioOkay = stationStatus.Team && stationStatus.Team.Id === wifiStatus.TeamId && wifiStatus.RadioLinked;
+      var radioOkay = stationStatus.Team && stationStatus.Team.Id === wifiStatus.TeamId &&
+        (wifiStatus.RadioLinked || dsConn.RobotLinked);
       teamRadioElement.attr("data-status-ok", radioOkay);
 
       // Format the robot status box.
@@ -138,7 +142,7 @@ var handleArenaStatus = function(data) {
       teamBypassElement.text("BYP");
     } else {
       teamBypassElement.attr("data-status-ok", true);
-      teamBypassElement.text("");
+      teamBypassElement.text("ES");
     }
   });
 };

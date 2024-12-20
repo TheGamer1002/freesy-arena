@@ -155,7 +155,7 @@ const handleArenaStatus = function(data) {
     const expectedTeamId = stationStatus.Team ? stationStatus.Team.Id : 0;
     let radioStatus = 0;
     if (expectedTeamId === wifiStatus.TeamId) {
-      if (wifiStatus.RadioLinked) {
+      if (wifiStatus.RadioLinked || stationStatus.DsConn?.RobotLinked) {
         radioStatus = 2;
       } else {
         radioStatus = 1;
@@ -290,6 +290,7 @@ const handleMatchLoad = function(data) {
   $("#substituteTeams").prop("disabled", true);
   $("#showOverlay").prop("disabled", false);
   $("#introRadio").prop("disabled", false);
+  $("#muteMatchSounds").prop("checked", false);
 }
 
 // Handles a websocket message to update the match time countdown.

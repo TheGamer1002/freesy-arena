@@ -65,14 +65,16 @@ func (web *Web) settingsPostHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if eventSettings.PlayoffType != playoffType {
+	if eventSettings.PlayoffType != playoffType || eventSettings.NumPlayoffAlliances != numAlliances {
 		alliances, err := web.arena.Database.GetAllAlliances()
 		if err != nil {
 			handleWebErr(w, err)
 			return
 		}
 		if len(alliances) > 0 {
-			web.renderSettings(w, r, "Cannot change playoff type after alliance selection has been finalized.")
+			web.renderSettings(
+				w, r, "Cannot change playoff type or size after alliance selection has been finalized.",
+			)
 			return
 		}
 	}
@@ -96,14 +98,15 @@ func (web *Web) settingsPostHandler(w http.ResponseWriter, r *http.Request) {
 	eventSettings.SwitchPassword = r.PostFormValue("switchPassword")
 	eventSettings.PlcAddress = r.PostFormValue("plcAddress")
 	eventSettings.AdminPassword = r.PostFormValue("adminPassword")
-	eventSettings.TeamSignRed1Address = r.PostFormValue("teamSignRed1Address")
-	eventSettings.TeamSignRed2Address = r.PostFormValue("teamSignRed2Address")
-	eventSettings.TeamSignRed3Address = r.PostFormValue("teamSignRed3Address")
-	eventSettings.TeamSignRedTimerAddress = r.PostFormValue("teamSignRedTimerAddress")
-	eventSettings.TeamSignBlue1Address = r.PostFormValue("teamSignBlue1Address")
-	eventSettings.TeamSignBlue2Address = r.PostFormValue("teamSignBlue2Address")
-	eventSettings.TeamSignBlue3Address = r.PostFormValue("teamSignBlue3Address")
-	eventSettings.TeamSignBlueTimerAddress = r.PostFormValue("teamSignBlueTimerAddress")
+	eventSettings.TeamSignRed1Id, _ = strconv.Atoi(r.PostFormValue("teamSignRed1Id"))
+	eventSettings.TeamSignRed2Id, _ = strconv.Atoi(r.PostFormValue("teamSignRed2Id"))
+	eventSettings.TeamSignRed3Id, _ = strconv.Atoi(r.PostFormValue("teamSignRed3Id"))
+	eventSettings.TeamSignRedTimerId, _ = strconv.Atoi(r.PostFormValue("teamSignRedTimerId"))
+	eventSettings.TeamSignBlue1Id, _ = strconv.Atoi(r.PostFormValue("teamSignBlue1Id"))
+	eventSettings.TeamSignBlue2Id, _ = strconv.Atoi(r.PostFormValue("teamSignBlue2Id"))
+	eventSettings.TeamSignBlue3Id, _ = strconv.Atoi(r.PostFormValue("teamSignBlue3Id"))
+	eventSettings.TeamSignBlueTimerId, _ = strconv.Atoi(r.PostFormValue("teamSignBlueTimerId"))
+	eventSettings.BlackmagicAddresses = r.PostFormValue("blackmagicAddresses")
 	eventSettings.WarmupDurationSec, _ = strconv.Atoi(r.PostFormValue("warmupDurationSec"))
 	eventSettings.AutoDurationSec, _ = strconv.Atoi(r.PostFormValue("autoDurationSec"))
 	eventSettings.PauseDurationSec, _ = strconv.Atoi(r.PostFormValue("pauseDurationSec"))

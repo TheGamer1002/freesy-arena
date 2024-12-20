@@ -760,28 +760,6 @@ const initializeSponsorDisplay = function() {
       }
       $("#sponsorContainer").append(slideHtml);
     });
-
-    // Start Carousel
-    let t;
-    const start = $('.carousel#sponsor').find('.active').attr('data-interval');
-    t = setTimeout("$('.carousel#sponsor').carousel({interval: 1000});", start-1000);
-
-    $('.carousel#sponsor').on('slid.bs.carousel', function () {   
-         clearTimeout(t);  
-         const duration = $(this).find('.active').attr('data-interval');
-
-         $('.carousel#sponsor').carousel('pause');
-         t = setTimeout("$('.carousel#sponsor').carousel();", duration-1000);
-    });
-
-    $('.carousel-control.right').on('click', function(){
-        clearTimeout(t);   
-    });
-
-    $('.carousel-control.left').on('click', function(){
-        clearTimeout(t);   
-    });
-
   });
 };
 
@@ -798,7 +776,7 @@ const setTeamInfo = function(side, position, teamId, cards, rankings) {
   avatarElement.toggle(teamId > 0);
 
   const cardElement = $(`#${side}FinalTeam${position}Card`);
-  cardElement.attr("data-card", cards[teamId.toString()]);
+  cardElement.attr("data-card", cards[teamId.toString()] || "");
 
   const ranking = rankings[teamId];
   let rankIndicator = "";

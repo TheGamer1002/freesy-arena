@@ -33,22 +33,47 @@ func TestTeamSign_Timer(t *testing.T) {
 	assert.Equal(t, [128]byte{}, sign.packetData)
 
 	// Check some basics about the data but don't unit-test the whole packet.
-	sign.SetAddress("10.0.100.56")
+	sign.SetId(56)
 	sign.update(arena, nil, true, "12:34", "Rear Text")
 	assert.Equal(t, "CYPRX", string(sign.packetData[0:5]))
 	assert.Equal(t, 56, int(sign.packetData[5]))
 	assert.Equal(t, 0x04, int(sign.packetData[6]))
 	assert.Equal(t, "12:34", string(sign.packetData[10:15]))
+	assert.Equal(t, []byte{0, 0}, sign.packetData[15:17])
 	assert.Equal(t, "Rear Text", string(sign.packetData[30:39]))
 	assert.Equal(t, 40, sign.packetIndex)
 
+	assertSign := func(expectedFrontText string, expectedFrontColor color.RGBA, expectedRearText string) {
+		frontText, frontColor, rearText := generateTimerTexts(arena, "23:45", "Rear Text")
+		assert.Equal(t, expectedFrontText, frontText)
+		assert.Equal(t, expectedFrontColor, frontColor)
+		assert.Equal(t, expectedRearText, rearText)
+	}
+
+	// Check field reset.
 	arena.FieldReset = false
-	frontText, frontColor := generateTimerText(false, "23:45")
-	assert.Equal(t, "23:45", frontText)
-	assert.Equal(t, whiteColor, frontColor)
-	frontText, frontColor = generateTimerText(true, "23:45")
-	assert.Equal(t, "SAFE", frontText)
-	assert.Equal(t, greenColor, frontColor)
+	assertSign("23:45", whiteColor, "Rear Text")
+	arena.FieldReset = true
+	assertSign("SAFE ", greenColor, "Rear Text")
+
+	// Check timeout mode.
+	arena.FieldReset = true
+	arena.MatchState = TimeoutActive
+	assertSign("23:45", whiteColor, "Field Break: 23:45")
+
+	// Check blank mode.
+	arena.AllianceStationDisplayMode = "blank"
+	assertSign("     ", whiteColor, "")
+
+	// Check alliance selection.
+	arena.AllianceStationDisplayMode = "logo"
+	arena.AudienceDisplayMode = "allianceSelection"
+	arena.AllianceSelectionShowTimer = false
+	assertSign("     ", whiteColor, "")
+	arena.AllianceSelectionShowTimer = true
+	assertSign("23:45", whiteColor, "")
+	arena.AllianceStationDisplayMode = "blank"
+	assertSign("     ", whiteColor, "")
 }
 
 func TestTeamSign_TeamNumber(t *testing.T) {
@@ -62,23 +87,30 @@ func TestTeamSign_TeamNumber(t *testing.T) {
 	assert.Equal(t, [128]byte{}, sign.packetData)
 
 	// Check some basics about the data but don't unit-test the whole packet.
-	sign.SetAddress("10.0.100.53")
+	sign.SetId(53)
 	sign.update(arena, allianceStation, true, "12:34", "Rear Text")
 	assert.Equal(t, "CYPRX", string(sign.packetData[0:5]))
 	assert.Equal(t, 53, int(sign.packetData[5]))
 	assert.Equal(t, 0x04, int(sign.packetData[6]))
-	assert.Equal(t, []byte{0x01, 53, 0x01, 0, 0}, sign.packetData[7:12])
-	assert.Equal(t, "No Team Assigned", string(sign.packetData[29:45]))
-	assert.Equal(t, 46, sign.packetIndex)
+	assert.Equal(t, []byte{0x01, 53, 0x01}, sign.packetData[7:10])
+	assert.Equal(t, "     ", string(sign.packetData[10:15]))
+	assert.Equal(t, []byte{0, 0}, sign.packetData[15:17])
+	assert.Equal(t, "No Team Assigned", string(sign.packetData[34:50]))
+	assert.Equal(t, 51, sign.packetIndex)
 
 	assertSign := func(isRed bool, expectedFrontText string, expectedFrontColor color.RGBA, expectedRearText string) {
-		frontText, frontColor, rearText := sign.generateTeamNumberTexts(arena, allianceStation, isRed, "Rear Text")
+		frontText, frontColor, rearText := sign.generateTeamNumberTexts(
+			arena, allianceStation, isRed, "12:34", "Rear Text",
+		)
 		assert.Equal(t, expectedFrontText, frontText)
-		assert.Equal(t, expectedFrontColor, frontColor)
 		assert.Equal(t, expectedRearText, rearText)
+
+		// Modify front color to account for time-based blinking.
+		frontColor.A = 255
+		assert.Equal(t, expectedFrontColor, frontColor)
 	}
 
-	assertSign(true, "", whiteColor, "    No Team Assigned")
+	assertSign(true, "     ", whiteColor, "    No Team Assigned")
 	arena.FieldReset = true
 	arena.assignTeam(254, "R1")
 	assertSign(true, "  254", greenColor, "254       Connect PC")
@@ -102,6 +134,10 @@ func TestTeamSign_TeamNumber(t *testing.T) {
 	allianceStation.DsConn.RobotLinked = true
 	assertSign(true, "  254", redColor, "254            Ready")
 	allianceStation.Bypass = true
+	assertSign(true, "  254", redColor, "254         Bypassed")
+
+	// Check that timeout mode has no effect on the team sign.
+	arena.MatchState = TimeoutActive
 	assertSign(true, "  254", redColor, "254         Bypassed")
 
 	// Check E-stop and A-stop.
@@ -128,4 +164,18 @@ func TestTeamSign_TeamNumber(t *testing.T) {
 	arena.MatchState = PreMatch
 	arena.assignTeam(1503, "R1")
 	assertSign(false, " 1503", blueColor, "1503      Connect PC")
+
+	// Check blank mode.
+	arena.AllianceStationDisplayMode = "blank"
+	assertSign(true, "     ", whiteColor, "")
+
+	// Check alliance selection.
+	arena.AllianceStationDisplayMode = "logo"
+	arena.AudienceDisplayMode = "allianceSelection"
+	arena.AllianceSelectionShowTimer = false
+	assertSign(true, "     ", whiteColor, "")
+	arena.AllianceSelectionShowTimer = true
+	assertSign(true, "12:34", whiteColor, "")
+	arena.AllianceStationDisplayMode = "blank"
+	assertSign(true, "     ", whiteColor, "")
 }

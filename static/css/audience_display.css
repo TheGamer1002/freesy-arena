@@ -398,12 +398,13 @@ html {
 .final-team-row {
   display: flex;
   flex-direction: row;
-  justify-content: space-between;
+  justify-content: center;
   align-items: center;
 }
 .final-team-avatar {
   width: 35px;
   height: 35px;
+  margin-right: 5px;
 }
 .final-team-number {
   width: 85px;
@@ -415,6 +416,7 @@ html {
 }
 .final-team-card {
   width: 20px;
+  margin-left: 5px;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -436,7 +438,7 @@ html {
   background-color: #e00;
 }
 .final-team-rank {
-  width: 45px;
+  width: 50px;
   display: flex;
   flex-direction: row;
   justify-content: flex-end;
@@ -522,7 +524,7 @@ html {
   background-color: #fff;
   text-align: center;
 }
-#sponsor .carousel-inner, #sponsor .item {
+#sponsor .carousel-inner, #sponsor .carousel-item {
   height: 100%;
 }
 .sponsor-image-container {
@@ -559,17 +561,17 @@ html {
   position: absolute;
   height: 100%;
   left: 3em;
-  top: 85vh;
+  top: 3em;
 }
 #allianceRankings {
-  max-width: calc(100% - 6em);
-  max-height: 15%;
+  max-width: 11em;
+  max-height: 92%;
   display: flex;
   flex-flow: column wrap;
   overflow: hidden;
   background-color: #fff;
   border: 2px solid #222;
-  font-size: 1.5em;
+  font-size: 2em;
   font-family: "FuturaLT";
 }
 .unpicked {
@@ -601,7 +603,7 @@ html {
   border: 2px solid #222;
   text-align: center;
   font-family: "FuturaLT";
-  font-size: 3.5em;
+  font-size: 2.6em;
 }
 #allianceSelectionTable img {
   width: 3em;
@@ -611,12 +613,12 @@ html {
   background-color: #ccc;
 }
 .alliance-cell {
-  padding: 0px 40px;
+  padding: 0px 20px;
   font-family: "FuturaLT";
   color: #999;
 }
 .selection-cell {
-  width: 3.4em;
+  width: 3.1em;
   color: #222;
 }
 #lowerThird {

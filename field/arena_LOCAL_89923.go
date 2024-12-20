@@ -22,9 +22,7 @@ import (
 
 const (
 	arenaLoopPeriodMs        = 10
-	arenaLoopWarningUs       = 3000
-	dsPacketPeriodMs         = 500
-	dsPacketWarningMs        = 550
+	dsPacketPeriodMs         = 250
 	periodicTaskPeriodSec    = 30
 	matchEndScoreDwellSec    = 3
 	postTimeoutSec           = 4
@@ -57,7 +55,6 @@ type Arena struct {
 	Plc              plc.Plc
 	TbaClient        *partner.TbaClient
 	NexusClient      *partner.NexusClient
-	BlackmagicClient *partner.BlackmagicClient
 	AllianceStations map[string]*AllianceStation
 	Displays         map[string]*Display
 	TeamSigns        *TeamSigns
@@ -158,14 +155,14 @@ func (arena *Arena) LoadSettings() error {
 	arena.EventSettings = settings
 
 	// Initialize the components that depend on settings.
-	arena.TeamSigns.Red1.SetId(settings.TeamSignRed1Id)
-	arena.TeamSigns.Red2.SetId(settings.TeamSignRed2Id)
-	arena.TeamSigns.Red3.SetId(settings.TeamSignRed3Id)
-	arena.TeamSigns.RedTimer.SetId(settings.TeamSignRedTimerId)
-	arena.TeamSigns.Blue1.SetId(settings.TeamSignBlue1Id)
-	arena.TeamSigns.Blue2.SetId(settings.TeamSignBlue2Id)
-	arena.TeamSigns.Blue3.SetId(settings.TeamSignBlue3Id)
-	arena.TeamSigns.BlueTimer.SetId(settings.TeamSignBlueTimerId)
+	arena.TeamSigns.Red1.SetAddress(settings.TeamSignRed1Address)
+	arena.TeamSigns.Red2.SetAddress(settings.TeamSignRed2Address)
+	arena.TeamSigns.Red3.SetAddress(settings.TeamSignRed3Address)
+	arena.TeamSigns.RedTimer.SetAddress(settings.TeamSignRedTimerAddress)
+	arena.TeamSigns.Blue1.SetAddress(settings.TeamSignBlue1Address)
+	arena.TeamSigns.Blue2.SetAddress(settings.TeamSignBlue2Address)
+	arena.TeamSigns.Blue3.SetAddress(settings.TeamSignBlue3Address)
+	arena.TeamSigns.BlueTimer.SetAddress(settings.TeamSignBlueTimerAddress)
 	accessPointWifiStatuses := [6]*network.TeamWifiStatus{
 		&arena.AllianceStations["R1"].WifiStatus,
 		&arena.AllianceStations["R2"].WifiStatus,
@@ -185,7 +182,6 @@ func (arena *Arena) LoadSettings() error {
 	arena.Plc.SetAddress(settings.PlcAddress)
 	arena.TbaClient = partner.NewTbaClient(settings.TbaEventCode, settings.TbaSecretId, settings.TbaSecret)
 	arena.NexusClient = partner.NewNexusClient(settings.TbaEventCode)
-	arena.BlackmagicClient = partner.NewBlackmagicClient(settings.BlackmagicAddresses)
 
 	game.MatchTiming.WarmupDurationSec = settings.WarmupDurationSec
 	game.MatchTiming.AutoDurationSec = settings.AutoDurationSec
@@ -239,7 +235,7 @@ func (arena *Arena) UpdatePlayoffTournament() error {
 
 // Sets up the arena for the given match.
 func (arena *Arena) LoadMatch(match *model.Match) error {
-	if arena.MatchState != PreMatch && arena.MatchState != TimeoutActive {
+	if arena.MatchState != PreMatch {
 		return fmt.Errorf("cannot load match while there is a match still in progress or with results pending")
 	}
 
@@ -463,18 +459,15 @@ func (arena *Arena) AbortMatch() error {
 	arena.AudienceDisplayModeNotifier.Notify()
 	arena.AllianceStationDisplayMode = "logo"
 	arena.AllianceStationDisplayModeNotifier.Notify()
-	go arena.BlackmagicClient.StopRecording()
 	return nil
 }
 
 // Clears out the match and resets the arena state unless there is a match underway.
 func (arena *Arena) ResetMatch() error {
-	if arena.MatchState != PostMatch && arena.MatchState != PreMatch && arena.MatchState != TimeoutActive {
+	if arena.MatchState != PostMatch && arena.MatchState != PreMatch {
 		return fmt.Errorf("cannot reset match while it is in progress")
 	}
-	if arena.MatchState != TimeoutActive {
-		arena.MatchState = PreMatch
-	}
+	arena.MatchState = PreMatch
 	arena.matchAborted = false
 	arena.AllianceStations["R1"].Bypass = false
 	arena.AllianceStations["R2"].Bypass = false
@@ -555,7 +548,6 @@ func (arena *Arena) Update() {
 		arena.AudienceDisplayModeNotifier.Notify()
 		arena.AllianceStationDisplayMode = "match"
 		arena.AllianceStationDisplayModeNotifier.Notify()
-		go arena.BlackmagicClient.StartRecording()
 		if game.MatchTiming.WarmupDurationSec > 0 {
 			arena.MatchState = WarmupPeriod
 			enabled = false
@@ -607,7 +599,6 @@ func (arena *Arena) Update() {
 			auto = false
 			enabled = false
 			sendDsPacket = true
-			go arena.BlackmagicClient.StopRecording()
 			go func() {
 				// Leave the scores on the screen briefly at the end of the match.
 				time.Sleep(time.Second * matchEndScoreDwellSec)
@@ -646,11 +637,7 @@ func (arena *Arena) Update() {
 	}
 
 	// Send a packet if at a period transition point or if it's been long enough since the last one.
-	msSinceLastDsPacket := int(time.Since(arena.lastDsPacketTime).Seconds() * 1000)
-	if sendDsPacket || msSinceLastDsPacket >= dsPacketPeriodMs {
-		if msSinceLastDsPacket >= dsPacketWarningMs && arena.lastDsPacketTime.After(time.Time{}) {
-			log.Printf("Warning: Long time since last driver station packet: %dms", msSinceLastDsPacket)
-		}
+	if sendDsPacket || time.Since(arena.lastDsPacketTime).Seconds()*1000 >= dsPacketPeriodMs {
 		arena.sendDsPacket(auto, enabled)
 		arena.ArenaStatusNotifier.Notify()
 	}
@@ -676,16 +663,11 @@ func (arena *Arena) Run() {
 	go arena.Plc.Run()
 
 	for {
-		loopStartTime := time.Now()
 		arena.Update()
 		if time.Since(arena.lastPeriodicTaskTime).Seconds() >= periodicTaskPeriodSec {
 			arena.lastPeriodicTaskTime = time.Now()
 			go arena.runPeriodicTasks()
 		}
-		if time.Since(loopStartTime).Microseconds() > arenaLoopWarningUs {
-			log.Printf("Warning: Arena loop iteration took a long time: %dus", time.Since(loopStartTime).Microseconds())
-		}
-
 		time.Sleep(time.Millisecond * arenaLoopPeriodMs)
 	}
 }
@@ -792,19 +774,10 @@ func (arena *Arena) preLoadNextMatch() {
 		return
 	}
 
-	teamIds := [6]int{nextMatch.Red1, nextMatch.Red2, nextMatch.Red3, nextMatch.Blue1, nextMatch.Blue2, nextMatch.Blue3}
-	if nextMatch.ShouldAllowNexusSubstitution() && arena.EventSettings.NexusEnabled {
-		// Attempt to get the match lineup from Nexus for FRC.
-		lineup, err := arena.NexusClient.GetLineup(nextMatch.TbaMatchKey)
-		if err != nil {
-			log.Printf("Failed to load lineup from Nexus: %s", err.Error())
-		} else {
-			teamIds = *lineup
-		}
-	}
-
 	var teams [6]*model.Team
-	for i, teamId := range teamIds {
+	for i, teamId := range []int{
+		nextMatch.Red1, nextMatch.Red2, nextMatch.Red3, nextMatch.Blue1, nextMatch.Blue2, nextMatch.Blue3,
+	} {
 		if teamId == 0 {
 			continue
 		}
